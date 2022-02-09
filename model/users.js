@@ -1,5 +1,10 @@
 const mongoose = require('mongoose');
+const bcrypt = require('bcrypt');
 const express = require('express');
+const Joi = require('joi');
+const res = require('express/lib/response');
+
+require('dotenv').config();
 
 
 const app = express();
@@ -13,8 +18,8 @@ const userScheme= new mongoose.Schema({
     fname : {type : String, required :true },
     mname : {type : String,},
     lname : {type : String, required :true },
-    email : {type : String, required :true,trim: true
-    },    
+    email : {type : String, required :true,trim: true, unique: true },    
+    password : {type : String, required :true,trim: true,maxlength: 1024 }, 
     address : {type : String, required :true },
     city : {type : String, required :true },
     state : {type : String, required :true },
@@ -24,25 +29,28 @@ const userScheme= new mongoose.Schema({
 });
 
 const userModel = mongoose.model('users',userScheme);
-const userData =  new userModel ({
-    fname : "Nigam",
-    mname : "Pinakin",
-    lname : "Mehta",
-    email : "fornigam@gmail.com",    
-    address :"SG Highway, Gota",
-    city : "Ahmedabad",
-    state : "Gujarat",
-    hobby : ["Cricket","Music"],
-    admin_role : 1,//1 : for super admin
-    user_status : 1, //1 is for action and 0 is for inactive
-})
+// const userData =  new userModel ({
+//     fname : "Nigam",
+//     mname : "Pinakin",
+//     lname : "Mehta",
+//     email : "fornigam@gmail.com",    
+//     address :"SG Highway, Gota",
+//     city : "Ahmedabad",
+//     state : "Gujarat",
+//     hobby : ["Cricket","Music"],
+//     admin_role : 1,//1 : for super admin
+//     user_status : 1, //1 is for action and 0 is for inactive
+// })
 
-const dataInsert = async(obj)=>{ 
+
+const dataInsert = async(req, res, obj)=>{ 
+    const salt = await bcrypt.genSalt(10)
     const userData =  new userModel ({
         fname : obj.fname,
         mname : obj.mname,
         lname : obj.lname,
-        email : obj.email,  
+        email : obj.email,
+        password : await bcrypt.hash(obj.password, salt),  
         address : obj.address,
         city : obj.city, 
         state : obj.state,
@@ -50,9 +58,15 @@ const dataInsert = async(obj)=>{
         admin_role : obj.admin_role,//1 : for super admin
         user_status :  obj.user_status,//1 is for action and 0 is for inactive
     })
-    //console.log("Calling insert",obj);
+
+    const emailExist = await userModel.findOne({email : obj.email})
+    if(emailExist){
+        res.status(404).send('Email is already exist.User is not added successfully')
+    } else {
+        return await userModel(userData).save()
+    }
     //if(!obj) return;
-    return await userModel(userData).save()
+    
 };
 
 const dataAllFetch = async()=>{
@@ -112,6 +126,28 @@ const updateUserValue = async(userobj) => {
     return updatedata
 }
 
+const login = async(req, res, obj)=> {
+   
+    const user = await userModel.findOne({ email : obj.email })
+       
+            //if user not exist than return status 400
+            if (!user) return res.status(400).json({ msg: "User not exist" })
+
+            //if user exist than compare password
+            //password comes from the user
+            //user.password comes from the database
+            const bpassword = await bcrypt.compare(obj.password, user.password)
+            if(bpassword === true){                
+                return user._id;
+             } else {
+                return res.status(401).json({ msg: "Invalid credencial" })
+            }
+          
+           
+
+       
+}
+
 //imediate invoke function
 (async ()=> {  
     //await dataInsert();
@@ -136,11 +172,23 @@ function isEmailExists(req,res,next) {
     }
 }
 
+
+const validateUser = function (user) {
+    const schema = Joi.object({
+      fname: Joi.string().min(5).max(50),
+      email: Joi.string().required().email().min(5).max(255),
+      password: Joi.string().required().min(5).max(1024),
+    });
+  
+    return schema.validate(user);
+  };
+
 module.exports = {
     dataAllFetch,
     dataInsert,
     updateUserValue,
-    deleteUser
-
+    deleteUser,
+    validateUser,
+    login
  }
  
