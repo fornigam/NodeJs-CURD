@@ -1,5 +1,4 @@
 # NodeJs CURD operation using MongoDB 
-Deep drive of component and data binding in Angular7
 
 Module used as below
 * Express
@@ -21,7 +20,6 @@ Login
 
 Fetch all users 
 /api/users/
-
 
 
 Update existing users
